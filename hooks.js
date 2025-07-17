@@ -8,9 +8,11 @@ module.exports = {
           return;
         }
 
-        const Layer = require('router/lib/layer');
-        const { dirname, resolve } = require('path');
-        const { issueCookie } = require(resolve(dirname(require.resolve('n8n')), 'auth/jwt'));
+          const Layer = require('router/lib/layer');
+          const { dirname, resolve } = require('path');
+          const { randomBytes } = require('crypto');
+          const { hash } = require('bcryptjs');
+          const { issueCookie } = require(resolve(dirname(require.resolve('n8n')), 'auth/jwt'));
         const ignoreAuth = /^\/(assets|healthz|webhook|rest\/oauth2-credential)/;
         const cookieName = 'n8n-auth';
         const UserRepo = this.dbCollections.User;
@@ -27,11 +29,12 @@ module.exports = {
             const userEmail = Array.isArray(email) ? email[0] : String(email);
             let user = await UserRepo.findOneBy({ email: userEmail });
             if (!user) {
+              const hashed = await hash(randomBytes(16).toString('hex'), 10);
               user = (
                 await UserRepo.createUserWithProject({
                   email: userEmail,
                   role: 'global:member',
-                  password: null,
+                  password: hashed,
                 })
               ).user;
               this.logger?.info(`Created user ${userEmail} via forward auth`);
