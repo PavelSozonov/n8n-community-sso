@@ -1,0 +1,58 @@
+[
+  {
+    "id": "demo",
+    "realm": "demo",
+    "enabled": true,
+    "displayName": "Demo Realm",
+    "sslRequired": "none",
+    "loginWithEmailAllowed": true,
+    "duplicateEmailsAllowed": false,
+    "resetPasswordAllowed": false,
+    "editUsernameAllowed": false,
+    "bruteForceProtected": false,
+    "components": {
+      "org.keycloak.storage.UserStorageProvider": {
+        "ldap": {
+          "id": "ldap",
+          "name": "ldap",
+          "providerId": "ldap",
+          "providerType": "org.keycloak.storage.UserStorageProvider",
+          "config": {
+            "enabled": ["true"],
+            "priority": ["0"],
+            "syncRegistrations": ["false"],
+            "vendor": ["other"],
+            "usernameLDAPAttribute": ["uid"],
+            "rdnLdapAttribute": ["uid"],
+            "uuidLdapAttribute": ["entryUUID"],
+            "userObjectClasses": ["inetOrgPerson"],
+            "connectionUrl": ["ldap://ldap:389"],
+            "usersDn": ["ou=people,dc=example,dc=org"],
+            "bindDn": ["cn=admin,dc=example,dc=org"],
+            "bindCredential": ["admin"],
+            "searchScope": ["1"],
+            "pagination": ["true"],
+            "authType": ["simple"],
+            "editMode": ["READ_ONLY"]
+          }
+        }
+      }
+    },
+    "clients": [
+      {
+        "clientId": "oauth2-proxy",
+        "name": "oauth2-proxy",
+        "secret": "oauth2proxysecret",
+        "enabled": true,
+        "publicClient": false,
+        "protocol": "openid-connect",
+        "redirectUris": ["http://nginx/oauth2/callback"],
+        "baseUrl": "http://nginx",
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": true,
+        "serviceAccountsEnabled": false
+      }
+    ]
+  }
+]

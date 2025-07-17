@@ -1,0 +1,73 @@
+version: '3.8'
+services:
+  ldap:
+    image: osixia/openldap:1.5.0
+    container_name: ldap
+    environment:
+      LDAP_ORGANISATION: Example Org
+      LDAP_DOMAIN: example.org
+      LDAP_ADMIN_PASSWORD: admin
+    volumes:
+      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif:ro
+    ports:
+      - "389:389"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/realm-export.json
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      - ldap
+    ports:
+      - "8080:8080"
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2-proxy
+    environment:
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: Keycloak
+      OAUTH2_PROXY_OIDC_ISSUER_URL: http://keycloak:8080/realms/demo
+      OAUTH2_PROXY_CLIENT_ID: oauth2-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: oauth2proxysecret
+      OAUTH2_PROXY_REDIRECT_URL: http://localhost/oauth2/callback
+      OAUTH2_PROXY_COOKIE_SECRET: 0123456789abcdef0123456789abcdef
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+    depends_on:
+      - keycloak
+
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost
+      - GENERIC_TIMEZONE=UTC
+      - EXTERNAL_HOOK_FILES=/hooks.js
+      - N8N_FORWARD_AUTH_HEADER=Remote-Email
+    volumes:
+      - ./.n8n:/home/node/.n8n
+      - ./hooks.js:/hooks.js:ro
+    depends_on:
+      - oauth2-proxy
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - oauth2-proxy
+      - n8n
