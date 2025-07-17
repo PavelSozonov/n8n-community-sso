@@ -12,7 +12,8 @@ N8N_FORWARD_AUTH_HEADER=Remote-Email
 ```
 
 2. Configure your proxy to authenticate users and pass their email in the header defined by `N8N_FORWARD_AUTH_HEADER`.
-3. Ensure the user already exists in n8n (invite them via the UI or API). If the user is found, the middleware issues the normal n8n auth cookie so the user is considered logged in.
+
+3. The middleware looks up the user by this email and issues the normal n8n auth cookie. If the user does not yet exist, it is automatically created with the default `member` role and a random password so the account is immediately active.
 
 Requests that already contain a valid `n8n-auth` cookie or match public routes like `/assets`, `/healthz`, `/webhook`, or `/rest/oauth2-credential` are ignored.
 
