@@ -11,7 +11,7 @@ LDAP <-> Keycloak <-> oauth2-proxy + Nginx <-> n8n (hook.js)
 2. Nginx asks `oauth2-proxy` to verify the request.  If the user is not logged in, `oauth2-proxy` redirects the browser to Keycloak.
 3. Keycloak authenticates against the demo LDAP server and redirects back to `oauth2-proxy` which in turn redirects to Nginx.
 4. After successful login `oauth2-proxy` exposes the authenticated email to Nginx via the `X-Auth-Request-Email` header.  Nginx clears any client-provided `Remote-Email` header, sets the trusted value and forwards the request to n8n.
-5. n8n’s external hook (`hooks.js`) reads this header, finds or creates the user in its database and issues the `n8n-auth` cookie so the user is logged in automatically.
+5. n8n’s external hook (`hooks.js`) reads this header. If a user with that email exists it logs them in, otherwise it creates a new account with the default member role, issues the `n8n-auth` cookie and logs them in automatically.
 6. Visiting `/logout` clears the n8n cookie and then sends the browser to `oauth2-proxy` which logs the user out of Keycloak as well.
 
 ## Running the demo
