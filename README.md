@@ -18,7 +18,7 @@ LDAP <-> Keycloak <-> oauth2-proxy + Nginx <-> n8n (hook.js)
 Requires Docker and Docker Compose.
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 Then open <http://localhost> in your browser.  You will be redirected to Keycloak.  Log in with the demo LDAP user credentials:
@@ -27,6 +27,16 @@ Then open <http://localhost> in your browser.  You will be redirected to Keycloa
 - **Password:** `password`
 
 Keycloak admin UI is available at <http://localhost:8080> (admin/admin).
+
+### Environment variables
+The compose file configures n8n with:
+
+```bash
+EXTERNAL_HOOK_FILES=/hooks.js
+N8N_FORWARD_AUTH_HEADER=Remote-Email
+```
+
+Set these variables in other environments to enable the hook and specify which header carries the authenticated email.
 
 ## Default credentials
 - LDAP admin: `cn=admin,dc=example,dc=org` / `admin`

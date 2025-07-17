@@ -11,12 +11,13 @@
     "editUsernameAllowed": false,
     "bruteForceProtected": false,
     "components": {
-      "org.keycloak.storage.UserStorageProvider": {
-        "ldap": {
+      "org.keycloak.storage.UserStorageProvider": [
+        {
           "id": "ldap",
           "name": "ldap",
           "providerId": "ldap",
           "providerType": "org.keycloak.storage.UserStorageProvider",
+          "parentId": "demo",
           "config": {
             "enabled": ["true"],
             "priority": ["0"],
@@ -36,7 +37,7 @@
             "editMode": ["READ_ONLY"]
           }
         }
-      }
+      ]
     },
     "clients": [
       {
@@ -46,8 +47,8 @@
         "enabled": true,
         "publicClient": false,
         "protocol": "openid-connect",
-        "redirectUris": ["http://nginx/oauth2/callback"],
-        "baseUrl": "http://nginx",
+        "redirectUris": ["http://localhost/oauth2/callback"],
+        "baseUrl": "http://localhost",
         "standardFlowEnabled": true,
         "implicitFlowEnabled": false,
         "directAccessGrantsEnabled": true,

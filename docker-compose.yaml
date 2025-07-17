@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   ldap:
     image: osixia/openldap:1.5.0
@@ -8,7 +7,7 @@ services:
       LDAP_DOMAIN: example.org
       LDAP_ADMIN_PASSWORD: admin
     volumes:
-      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif:ro
+      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
     ports:
       - "389:389"
 
