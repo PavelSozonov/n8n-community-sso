@@ -8,11 +8,11 @@ module.exports = {
           return;
         }
 
-          const Layer = require('router/lib/layer');
-          const { dirname, resolve } = require('path');
-          const { randomBytes } = require('crypto');
-          const { hash } = require('bcryptjs');
-          const { issueCookie } = require(resolve(dirname(require.resolve('n8n')), 'auth/jwt'));
+        const Layer = require('router/lib/layer');
+        const { dirname, resolve } = require('path');
+        const { randomBytes } = require('crypto');
+        const { hash } = require('bcryptjs');
+        const { issueCookie } = require(resolve(dirname(require.resolve('n8n')), 'auth/jwt'));
         const ignoreAuth = /^\/(assets|healthz|webhook|rest\/oauth2-credential)/;
         const cookieName = 'n8n-auth';
         const UserRepo = this.dbCollections.User;
