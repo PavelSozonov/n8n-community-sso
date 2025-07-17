@@ -17,7 +17,6 @@
           "name": "ldap",
           "providerId": "ldap",
           "subType": "org.keycloak.storage.UserStorageProvider",
-          "parentId": "demo",
           "config": {
             "enabled": ["true"],
             "priority": ["0"],

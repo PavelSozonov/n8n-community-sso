@@ -15,21 +15,25 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.1
     container_name: keycloak
-    command: start-dev --import-realm
+    command: start-dev --import-realm --health-enabled=true
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-      KEYCLOAK_IMPORT: /opt/keycloak/data/import/realm-export.json
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HOSTNAME_ADMIN: localhost
+      KC_HOSTNAME: localhost
     volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
-    depends_on:
-      - ldap
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
       - "8080:8080"
+    depends_on:
+      - ldap
 
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
     container_name: oauth2-proxy
+    restart: unless-stopped
     environment:
       OAUTH2_PROXY_PROVIDER: oidc
       OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: Keycloak
@@ -42,6 +46,9 @@ services:
       OAUTH2_PROXY_EMAIL_DOMAINS: "*"
       OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
       OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_UPSTREAM: "http://n8n:5678"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION: "true"
     depends_on:
       - keycloak
 
@@ -49,21 +56,21 @@ services:
     image: n8nio/n8n
     container_name: n8n
     environment:
-      - N8N_HOST=localhost
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost
-      - GENERIC_TIMEZONE=UTC
-      - EXTERNAL_HOOK_FILES=/hooks.js
-      - N8N_FORWARD_AUTH_HEADER=Remote-Email
+      N8N_BASIC_AUTH_ACTIVE: "false"
+      N8N_HOST: 0.0.0.0
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_USER_MANAGEMENT_DISABLED: "false"
+      N8N_EXTERNAL_HOOK_FILES: /home/node/.n8n/hooks.js
     volumes:
-      - ./.n8n:/home/node/.n8n
-      - ./hooks.js:/hooks.js:ro
+      - ./hooks.js:/home/node/.n8n/hooks.js:ro
     depends_on:
       - oauth2-proxy
 
   nginx:
     image: nginx:alpine
     container_name: nginx
+    restart: unless-stopped
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
@@ -71,3 +78,4 @@ services:
     depends_on:
       - oauth2-proxy
       - n8n
+

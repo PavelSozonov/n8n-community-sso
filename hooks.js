@@ -8,11 +8,11 @@ module.exports = {
           return;
         }
 
-          const Layer = require('router/lib/layer');
-          const { dirname, resolve } = require('path');
-          const { randomBytes } = require('crypto');
-          const { hash } = require('bcryptjs');
-          const { issueCookie } = require(resolve(dirname(require.resolve('n8n')), 'auth/jwt'));
+        const Layer = require('router/lib/layer');
+        const { dirname, resolve } = require('path');
+        const { randomBytes } = require('crypto');
+        const { hash } = require('bcryptjs');
+        const { issueCookie } = require(resolve(dirname(require.resolve('n8n')), 'auth/jwt'));
         const ignoreAuth = /^\/(assets|healthz|webhook|rest\/oauth2-credential)/;
         const cookieName = 'n8n-auth';
         const UserRepo = this.dbCollections.User;
@@ -24,8 +24,11 @@ module.exports = {
             if (ignoreAuth.test(req.url)) return next();
             if (!config.get('userManagement.isInstanceOwnerSetUp', false)) return next();
             if (req.cookies?.[cookieName]) return next();
-            const email = req.headers[headerName.toLowerCase()];
+            
+            // Check for oauth2-proxy headers
+            const email = req.headers['x-forwarded-user'] || req.headers['x-auth-request-user'] || req.headers['x-forwarded-email'];
             if (!email) return next();
+            
             const userEmail = Array.isArray(email) ? email[0] : String(email);
             let user = await UserRepo.findOneBy({ email: userEmail });
             if (!user) {
@@ -37,7 +40,7 @@ module.exports = {
                   password: hashed,
                 })
               ).user;
-              this.logger?.info(`Created user ${userEmail} via forward auth`);
+              this.logger?.info(`Created user ${userEmail} via oauth2-proxy`);
             }
             issueCookie(res, user);
             req.user = user;
