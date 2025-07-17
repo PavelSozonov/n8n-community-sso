@@ -18,7 +18,7 @@ LDAP <-> Keycloak <-> oauth2-proxy + Nginx <-> n8n (hook.js)
 Requires Docker and Docker Compose.
 
 ```bash
-docker compose up
+docker-compose up
 ```
 
 Then open <http://localhost> in your browser.  You will be redirected to Keycloak.  Log in with the demo LDAP user credentials:
