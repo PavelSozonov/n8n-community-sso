@@ -16,5 +16,6 @@ N8N_FORWARD_AUTH_HEADER=Remote-Email
 
 Requests that already contain a valid `n8n-auth` cookie or match public routes like `/assets`, `/healthz`, `/webhook`, or `/rest/oauth2-credential` are ignored.
 
-See `hooks.js` for the implementation details.
+The hook exports the `n8n.ready` handler in the modern format (`module.exports = { n8n: { ready: [...] } }`) and inserts the middleware right after the cookie parser layer for seamless integration.
 
+See `hooks.js` for the implementation details.
