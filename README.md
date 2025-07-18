@@ -7,6 +7,8 @@
 
 A complete **Single Sign-On (SSO)** demonstration for **n8n Community Edition** using Docker Compose. This system integrates LDAP, Keycloak, nginx with oauth2-proxy, and automatic user provisioning in n8n through external hooks.
 
+> **Inspired by:** This project was inspired by the excellent article [n8n & Authelia - Bypass n8n native login page using Trusted Header Single Sign-On](https://kb.jarylchng.com/i/n8n-and-authelia-bypass-n8n-native-login-page-usin-sNRmS-7j5u1/) by Jaryl Chng, which demonstrates how to implement trusted header SSO with n8n external hooks.
+
 ## Table of Contents
 
 - [Solution Architecture](#solution-architecture)
@@ -320,7 +322,7 @@ OAUTH2_PROXY_SET_XAUTHREQUEST=true
 - `hooks.js` - n8n hook for automatic user provisioning
 
 ### Component Versions
-- **n8n:** latest (n8nio/n8n)
+- **n8n:** latest (n8nio/n8n) - tested on v1.100.1
 - **Keycloak:** 24.0.1
 - **oauth2-proxy:** v7.6.0
 - **nginx:** alpine
