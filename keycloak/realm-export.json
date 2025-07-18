@@ -10,6 +10,7 @@
     "resetPasswordAllowed": false,
     "editUsernameAllowed": false,
     "bruteForceProtected": false,
+    "verifyEmail": false,
     "components": {
       "org.keycloak.storage.UserStorageProvider": [
         {
@@ -33,7 +34,82 @@
             "searchScope": ["1"],
             "pagination": ["true"],
             "authType": ["simple"],
-            "editMode": ["READ_ONLY"]
+            "editMode": ["READ_ONLY"],
+            "fullSyncPeriod": ["-1"],
+            "changedSyncPeriod": ["-1"],
+            "batchSizeForSync": ["1000"],
+            "connectionPooling": ["true"],
+            "connectionTimeout": [""],
+            "readTimeout": [""],
+            "debug": ["false"],
+            "trustEmail": ["true"]
+          },
+          "subComponents": {
+            "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+              {
+                "id": "username",
+                "name": "username",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "ldap.attribute": ["uid"],
+                  "user.model.attribute": ["username"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"],
+                  "is.mandatory.in.ldap": ["true"]
+                }
+              },
+              {
+                "id": "email",
+                "name": "email",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "ldap.attribute": ["mail"],
+                  "user.model.attribute": ["email"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"],
+                  "is.mandatory.in.ldap": ["false"]
+                }
+              },
+              {
+                "id": "first-name",
+                "name": "first name",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "ldap.attribute": ["givenName"],
+                  "user.model.attribute": ["firstName"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"],
+                  "is.mandatory.in.ldap": ["false"]
+                }
+              },
+              {
+                "id": "last-name",
+                "name": "last name",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "ldap.attribute": ["sn"],
+                  "user.model.attribute": ["lastName"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"],
+                  "is.mandatory.in.ldap": ["false"]
+                }
+              },
+              {
+                "id": "full-name",
+                "name": "full name",
+                "providerId": "full-name-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "ldap.full.name.attribute": ["cn"],
+                  "read.only": ["true"],
+                  "write.only": ["false"]
+                }
+              }
+            ]
           }
         }
       ]
