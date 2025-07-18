@@ -27,8 +27,35 @@ module.exports = {
             if (!config.get('userManagement.isInstanceOwnerSetUp', false)) return next();
             if (req.cookies?.[cookieName]) return next();
             
-            // Get email from the configured header (e.g., Remote-Email)
+            // Get user data from headers
             const email = req.headers[headerName.toLowerCase()] || req.headers[headerName];
+            const authHeader = req.headers['authorization'] || req.headers['x-auth-request-access-token'] || '';
+            let firstName = '';
+            let lastName = '';
+
+            
+            // Try to extract firstName and lastName from JWT token
+            if (authHeader) {
+              try {
+                const token = authHeader.replace('Bearer ', '');
+                if (token) {
+                  // Decode JWT payload (base64 decode middle part)
+                  const parts = token.split('.');
+                  if (parts.length === 3) {
+                    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+                    firstName = payload.given_name || payload.firstName || '';
+                    lastName = payload.family_name || payload.lastName || '';
+                    this.logger?.debug(`Extracted from JWT: firstName="${firstName}", lastName="${lastName}"`);
+                  }
+                }
+              } catch (error) {
+                this.logger?.debug(`Failed to decode JWT: ${error.message}`);
+              }
+            }
+            
+            // Fallback to headers if JWT extraction failed
+            if (!firstName) firstName = req.headers['remote-given-name'] || '';
+            if (!lastName) lastName = req.headers['remote-family-name'] || '';
             
             if (!email) {
               this.logger?.debug(`No ${headerName} header found, skipping SSO auto-login`);
@@ -36,6 +63,8 @@ module.exports = {
             }
             
             const userEmail = Array.isArray(email) ? email[0] : String(email).trim();
+            const userFirstName = Array.isArray(firstName) ? firstName[0] : String(firstName).trim();
+            const userLastName = Array.isArray(lastName) ? lastName[0] : String(lastName).trim();
             
             if (!userEmail || userEmail === '') {
               this.logger?.debug(`Empty ${headerName} header, skipping SSO auto-login`);
@@ -47,16 +76,39 @@ module.exports = {
             let user = await UserRepo.findOneBy({ email: userEmail });
             if (!user) {
               const hashed = await hash(randomBytes(16).toString('hex'), 10);
-              user = (
-                await UserRepo.createUserWithProject({
-                  email: userEmail,
-                  role: 'global:member',
-                  password: hashed,
-                })
-              ).user;
-              this.logger?.info(`Created new user: ${userEmail} via SSO`);
+              
+              // Prepare user data with firstName and lastName from LDAP
+              const userData = {
+                email: userEmail,
+                role: 'global:member',
+                password: hashed,
+              };
+              
+              // Add firstName and lastName if available from LDAP
+              if (userFirstName) userData.firstName = userFirstName;
+              if (userLastName) userData.lastName = userLastName;
+              
+              user = (await UserRepo.createUserWithProject(userData)).user;
+              
+              this.logger?.info(`Created new user: ${userEmail} (${userFirstName} ${userLastName}) via SSO`);
             } else {
-              this.logger?.info(`Existing user logged in: ${userEmail} via SSO`);
+              // Update existing user's firstName and lastName if they changed in LDAP
+              let userUpdated = false;
+              if (userFirstName && user.firstName !== userFirstName) {
+                user.firstName = userFirstName;
+                userUpdated = true;
+              }
+              if (userLastName && user.lastName !== userLastName) {
+                user.lastName = userLastName;
+                userUpdated = true;
+              }
+              
+              if (userUpdated) {
+                await UserRepo.save(user);
+                this.logger?.info(`Updated user: ${userEmail} (${userFirstName} ${userLastName}) via SSO`);
+              } else {
+                this.logger?.info(`Existing user logged in: ${userEmail} via SSO`);
+              }
             }
             
             issueCookie(res, user);

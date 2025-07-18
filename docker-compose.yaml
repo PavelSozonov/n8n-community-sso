@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
 
   oauth2-proxy:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
     container_name: oauth2-proxy
     restart: unless-stopped
     environment:
@@ -54,9 +54,12 @@ services:
       OAUTH2_PROXY_SKIP_OIDC_EMAIL_VERIFICATION: "true"
       OAUTH2_PROXY_WHITELIST_DOMAINS: "localhost"
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
-      OAUTH2_PROXY_SET_XAUTHREQUEST_HEADERS: "X-Auth-Request-Email,X-Auth-Request-User"
+      OAUTH2_PROXY_SET_XAUTHREQUEST_HEADERS: "X-Auth-Request-Email,X-Auth-Request-User,X-Auth-Request-Access-Token"
       OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
       OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_OIDC_EXTRA_AUDIENCES: "oauth2-proxy"
+      OAUTH2_PROXY_EXTRA_JWT_ISSUERS: "http://keycloak:8080/realms/demo=oauth2-proxy"
     depends_on:
       - keycloak
 
@@ -73,7 +76,7 @@ services:
       N8N_FORWARD_AUTH_HEADER: "Remote-Email"
     volumes:
       - ./hooks.js:/home/node/.n8n/hooks.js:ro
-      - .n8n:/home/node/.n8n
+      - n8n_cache:/home/node/.n8n
     ports:
       - "5678:5678"
     depends_on:
@@ -91,4 +94,7 @@ services:
     depends_on:
       - oauth2-proxy
       - n8n
+
+volumes:
+  n8n_cache:
 
