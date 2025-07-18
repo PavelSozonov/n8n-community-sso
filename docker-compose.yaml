@@ -1,0 +1,94 @@
+services:
+  ldap:
+    image: osixia/openldap:1.5.0
+    container_name: ldap
+    command: --copy-service
+    environment:
+      LDAP_ORGANISATION: "Example Org"
+      LDAP_DOMAIN: "example.org"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif
+    ports:
+      - "389:389"
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME_ADMIN: localhost
+      KC_HOSTNAME: localhost
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ldap
+    restart: unless-stopped
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2-proxy
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: "Keycloak"
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "http://keycloak:8080/realms/demo"
+      OAUTH2_PROXY_CLIENT_ID: "oauth2-proxy"
+      OAUTH2_PROXY_CLIENT_SECRET: "oauth2proxysecret"
+      OAUTH2_PROXY_REDIRECT_URL: "http://localhost/oauth2/callback"
+      OAUTH2_PROXY_COOKIE_SECRET: "0123456789abcdef0123456789abcdef"
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_INSECURE_OIDC_SKIP_ISSUER_VERIFICATION: "true"
+      OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"
+      OAUTH2_PROXY_SKIP_OIDC_EMAIL_VERIFICATION: "true"
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "localhost"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST_HEADERS: "X-Auth-Request-Email,X-Auth-Request-User"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+    depends_on:
+      - keycloak
+
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    environment:
+      N8N_BASIC_AUTH_ACTIVE: "false"
+      N8N_HOST: "0.0.0.0"
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: "http"
+      N8N_USER_MANAGEMENT_DISABLED: "false"
+      EXTERNAL_HOOK_FILES: "/home/node/.n8n/hooks.js"
+      N8N_FORWARD_AUTH_HEADER: "Remote-Email"
+    volumes:
+      - ./hooks.js:/home/node/.n8n/hooks.js:ro
+      - .n8n:/home/node/.n8n
+    ports:
+      - "5678:5678"
+    depends_on:
+      - oauth2-proxy
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - oauth2-proxy
+      - n8n
+
