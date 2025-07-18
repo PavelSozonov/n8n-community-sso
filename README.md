@@ -47,8 +47,8 @@ A complete **Single Sign-On (SSO)** demonstration for **n8n Community Edition** 
 3. If not authenticated → **oauth2-proxy** redirects to **Keycloak**
 4. **Keycloak** authenticates user against **LDAP**
 5. After successful login **oauth2-proxy** receives tokens and sets headers
-6. **nginx** proxies request to **n8n** with trusted `Remote-Email` header
-7. **n8n hook** reads header, finds/creates user and issues session cookie
+6. **nginx** proxies request to **n8n** with trusted headers (`Remote-Email`, `Authorization` with JWT token)
+7. **n8n hook** reads email header and decodes JWT to extract firstName/lastName from LDAP, then creates user and issues session cookie
 
 ## Components
 
@@ -71,7 +71,7 @@ A complete **Single Sign-On (SSO)** demonstration for **n8n Community Edition** 
 ### 3. oauth2-proxy (OAuth2/OIDC Client)
 - **Internal Port:** 4180
 - **Provider:** Keycloak OIDC
-- **Headers:** sets `X-Auth-Request-Email`, `X-Auth-Request-User`
+- **Headers:** sets `X-Auth-Request-Email`, `X-Auth-Request-User`, `X-Auth-Request-Access-Token`, `Authorization`
 - **Key Settings:**
   - `OAUTH2_PROXY_SKIP_OIDC_EMAIL_VERIFICATION=true`
   - `OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL=true`
@@ -83,13 +83,19 @@ A complete **Single Sign-On (SSO)** demonstration for **n8n Community Edition** 
 - **Architecture:** auth_request pattern (not full proxy)
 - **Functions:**
   - Protects n8n access via `auth_request`
-  - **SECURITY:** Strips any client-provided `Remote-Email` headers
-  - Sets trusted `Remote-Email` header only after successful authentication
+  - **SECURITY:** Strips any client-provided headers (`Remote-Email`, `Authorization`, `X-Auth-Request-Access-Token`)
+  - Sets trusted headers only after successful authentication:
+    - `Remote-Email` (user email)
+    - `Authorization` (JWT token with user claims)
+    - `X-Auth-Request-Access-Token` (OAuth2 access token)
   - Proxies requests to n8n with proper WebSocket support
 
 ### 5. n8n (Workflow Engine)
 - **Port:** 5678 (direct access), 80 (via nginx)
-- **External Hook:** automatically creates users based on `Remote-Email` header
+- **External Hook:** automatically creates users with email, firstName, and lastName from LDAP
+- **User Data Sources:** 
+  - Email from `Remote-Email` header
+  - First name and last name extracted from JWT token (LDAP `givenName` and `sn`)
 - **Environment Variables:**
   - `EXTERNAL_HOOK_FILES=/home/node/.n8n/hooks.js`
   - `N8N_FORWARD_AUTH_HEADER=Remote-Email`
@@ -127,7 +133,7 @@ docker compose logs n8n
 3. Use demo credentials:
    - **Username:** `jdoe`
    - **Password:** `password`
-4. After successful login, you'll be redirected to n8n with automatic user creation
+4. After successful login, you'll be redirected to n8n with automatic user creation including full name from LDAP
 
 ## Security
 
@@ -135,20 +141,27 @@ docker compose logs n8n
 nginx is configured to **prevent header injection attacks**:
 
 ```nginx
-# CRITICAL SECURITY: Strip any client-provided Remote-Email header
+# CRITICAL SECURITY: Strip any client-provided headers to prevent injection
 proxy_set_header Remote-Email "";
+proxy_set_header Authorization "";
+proxy_set_header X-Auth-Request-Access-Token "";
 
-# Set trusted header ONLY after successful authentication
+# Set trusted headers ONLY after successful authentication
 auth_request_set $email $upstream_http_x_auth_request_email;
+auth_request_set $access_token $upstream_http_x_auth_request_access_token;
+auth_request_set $auth_header $upstream_http_authorization;
+
 proxy_set_header Remote-Email $email;
+proxy_set_header X-Auth-Request-Access-Token $access_token;
+proxy_set_header Authorization $auth_header;
 ```
 
 ### Security Principles
-1. **nginx** never forwards `Remote-Email` header from client
-2. Header is set only after successful `auth_request` to oauth2-proxy
-3. oauth2-proxy validates tokens through Keycloak
-4. Keycloak authenticates against LDAP
-5. n8n trusts only this header for automatic login
+1. **nginx** never forwards user data headers (`Remote-Email`, `Authorization`, `X-Auth-Request-Access-Token`) from client
+2. Headers are set only after successful `auth_request` to oauth2-proxy
+3. oauth2-proxy validates tokens through Keycloak and provides JWT with user claims
+4. Keycloak authenticates against LDAP and includes user details in JWT (email, given_name, family_name)
+5. n8n hook decodes JWT to extract user data and creates users automatically
 
 ## Logout
 
@@ -218,6 +231,7 @@ docker compose ps
 
 ### Complete Reset
 ```bash
+# This will remove all volumes including n8n cache, user data, and workflows
 docker compose down -v
 docker compose up -d
 ```
@@ -263,6 +277,8 @@ echo:
 - Add external volumes for databases
 - Configure Keycloak and n8n backups
 - Use external databases (PostgreSQL)
+- Consider persistent volumes for n8n workflows and cache in production
+- Implement proper backup strategies for Docker volumes
 
 #### 4. Monitoring
 - Add health checks
@@ -304,6 +320,12 @@ OAUTH2_PROXY_SKIP_OIDC_EMAIL_VERIFICATION=true
 OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL=true
 OAUTH2_PROXY_WHITELIST_DOMAINS=localhost
 OAUTH2_PROXY_SET_XAUTHREQUEST=true
+OAUTH2_PROXY_SET_XAUTHREQUEST_HEADERS=X-Auth-Request-Email,X-Auth-Request-User,X-Auth-Request-Access-Token
+OAUTH2_PROXY_PASS_ACCESS_TOKEN=true
+OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER=true
+OAUTH2_PROXY_SET_AUTHORIZATION_HEADER=true
+OAUTH2_PROXY_OIDC_EXTRA_AUDIENCES=oauth2-proxy
+OAUTH2_PROXY_EXTRA_JWT_ISSUERS=http://keycloak:8080/realms/demo=oauth2-proxy
 ```
 
 ## Additional Information
@@ -315,16 +337,22 @@ OAUTH2_PROXY_SET_XAUTHREQUEST=true
 - [nginx auth_request module](http://nginx.org/en/docs/http/ngx_http_auth_request_module.html)
 
 ### Configuration Files
-- `docker-compose.yaml` - Service orchestration with proper dependencies
+- `docker-compose.yaml` - Service orchestration with proper dependencies and Docker volumes
 - `nginx/nginx.conf` - Reverse proxy configuration with auth_request pattern
 - `keycloak/realm-export.json` - Pre-configured realm with LDAP federation and mappers
 - `ldap/bootstrap.ldif` - Demo LDAP users
 - `hooks.js` - n8n hook for automatic user provisioning
 
+### Data Management
+- **n8n cache**: Stored in Docker volume `n8n_cache` (cleaned with `docker compose down -v`)
+- **LDAP data**: Temporary container storage (reset on container restart)
+- **Keycloak data**: Temporary container storage (reset on container restart)
+- **Demo environment**: All data is ephemeral for testing purposes
+
 ### Component Versions
-- **n8n:** latest (n8nio/n8n) - tested on v1.100.1
+- **n8n:** latest (n8nio/n8n) - tested on v1.102.4
 - **Keycloak:** 24.0.1
-- **oauth2-proxy:** v7.6.0
+- **oauth2-proxy:** v7.7.1
 - **nginx:** alpine
 - **OpenLDAP:** 1.5.0
 
@@ -336,7 +364,7 @@ This demonstration provides a complete SSO integration for n8n Community Edition
 - **Keycloak** as Identity Provider with email verification disabled  
 - **oauth2-proxy** as OAuth2/OIDC client with unverified email support  
 - **nginx** as secure reverse proxy with auth_request pattern  
-- **Automatic user provisioning** in n8n via external hooks  
+- **Automatic user provisioning** in n8n via external hooks with firstName and lastName from LDAP  
 - **Secure header handling** with injection protection  
 - **Complete logout flow** across all services  
 - **Docker Desktop compatibility** with proper service networking  
@@ -347,9 +375,13 @@ This demonstration provides a complete SSO integration for n8n Community Edition
 
 1. **Open:** http://localhost
 2. **Login:** jdoe / password  
-3. **Result:** Automatic redirect to n8n with created user account
+3. **Result:** Automatic redirect to n8n with created user account including:
+   - **Email:** jdoe@example.org
+   - **First Name:** John (from LDAP `givenName`)
+   - **Last Name:** Doe (from LDAP `sn`)
+   - **Role:** global:member
 
-The system handles the complete authentication chain: Browser → nginx → oauth2-proxy → Keycloak → LDAP → back to n8n with automatic user provisioning.
+The system handles the complete authentication chain: Browser → nginx → oauth2-proxy → Keycloak → LDAP → JWT token with user claims → n8n hook decodes JWT and creates user with full profile.
 
 ## Contributing
 
